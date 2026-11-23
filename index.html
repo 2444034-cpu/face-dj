@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FACE FM — 표정으로 듣는 라디오</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #EEF2F8;
+    --ink: #13286B;
+    --soft: #6E7FA6;
+    --line: #C9D3E6;
+    --accent: #13286B;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--paper); transition: background .8s; }
+  body {
+    font-family: "Noto Sans KR", -apple-system, sans-serif;
+    color: var(--ink);
+    min-height: 100vh;
+    padding: 28px 40px 40px;
+    max-width: 1180px;
+    margin: 0 auto;
+  }
+  .mono { font-family: "IBM Plex Mono", monospace; letter-spacing: 0.02em; }
+  .serif { font-family: "Instrument Serif", serif; font-weight: 400; }
+
+  /* ---------- top bar ---------- */
+  .bar {
+    display: flex; justify-content: space-between; align-items: baseline;
+    border-bottom: 1px solid var(--ink);
+    padding-bottom: 12px;
+    font-size: 12px; text-transform: uppercase;
+  }
+  .bar .logo { font-size: 30px; text-transform: none; letter-spacing: -0.01em; }
+  .bar .logo i { color: var(--accent); transition: color .6s; }
+  .onair { display: inline-flex; align-items: center; gap: 8px; color: var(--soft); }
+  .onair .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+  body.live .onair { color: var(--ink); }
+  body.live .onair .dot { background: var(--accent); animation: blink 1.4s infinite; }
+  @keyframes blink { 50% { opacity: .2; } }
+
+  /* ---------- main ---------- */
+  main {
+    display: grid;
+    grid-template-columns: 5fr 6fr;
+    gap: 56px;
+    padding-top: 36px;
+  }
+  @media (max-width: 860px) {
+    body { padding: 20px; }
+    main { grid-template-columns: 1fr; gap: 32px; }
+  }
+
+  figure { margin: 0; }
+  .frame {
+    aspect-ratio: 1/1;
+    border: 1px solid var(--ink);
+    background: #DCE4F2;
+    position: relative;
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .frame canvas { width: 100%; height: 100%; display: block; filter: grayscale(1) contrast(1.15); }
+  /* 청사진(cyanotype) 느낌의 파란 톤 */
+  .frame .tint {
+    position: absolute; inset: 0; pointer-events: none;
+    background: var(--accent); mix-blend-mode: screen;
+    transition: background .8s;
+  }
+  .frame .empty { font-size: 13px; color: var(--soft); text-align: center; line-height: 1.9; }
+  .frame .tag {
+    position: absolute; left: 0; top: 0; z-index: 2;
+    background: var(--ink); color: var(--paper);
+    font-size: 11px; padding: 5px 9px;
+  }
+  figcaption {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: var(--soft);
+    padding-top: 10px; text-transform: uppercase;
+  }
+
+  .label { font-size: 11px; color: var(--soft); text-transform: uppercase; }
+  .mood {
+    font-size: clamp(88px, 12vw, 150px);
+    line-height: .9;
+    letter-spacing: -0.02em;
+    margin: 14px 0 10px;
+    color: var(--accent);
+    transition: color .6s;
+  }
+  .mood.off { color: var(--line); }
+  .sub { font-size: 15px; }
+  .track { font-size: 12px; color: var(--soft); margin-top: 6px; }
+
+  .hold { margin-top: 22px; height: 2px; background: var(--line); }
+  .hold div { height: 100%; width: 0; background: var(--accent); }
+  .hold-text { font-size: 11px; color: var(--soft); margin-top: 8px; height: 14px; }
+
+  .eq { display: flex; align-items: flex-end; justify-content: space-between; height: 40px; margin: 22px 0 28px; }
+  .eq span { width: 2px; height: 1px; background: var(--accent); transition: background .6s; }
+
+  /* channel list */
+  .list { border-top: 1px solid var(--ink); }
+  .row {
+    display: grid;
+    grid-template-columns: 34px 1fr 1.6fr 80px 44px;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line);
+    font-size: 12px;
+    color: var(--soft);
+    transition: color .3s;
+  }
+  .row .name { font-size: 26px; color: var(--ink); line-height: 1; }
+  .row .meter { height: 2px; background: var(--line); position: relative; }
+  .row .meter div { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--soft); }
+  .row .pct { text-align: right; }
+  .row.on { color: var(--ink); }
+  .row.on .name { font-style: italic; color: var(--rowc); }
+  .row.on .meter div { background: var(--rowc); }
+
+  /* ---------- controls ---------- */
+  .controls { display: flex; gap: 10px; margin-top: 32px; }
+  button {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 13px; text-transform: uppercase; letter-spacing: .04em;
+    background: var(--ink); color: var(--paper);
+    border: 1px solid var(--ink);
+    padding: 14px 22px; cursor: pointer;
+  }
+  button.line { background: transparent; color: var(--ink); }
+  button:hover:not(:disabled) { opacity: .85; }
+  button:disabled { opacity: .35; cursor: default; }
+
+  footer {
+    margin-top: 56px; padding-top: 12px;
+    border-top: 1px solid var(--ink);
+    display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+    font-size: 11px; color: var(--soft); text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div class="logo serif">Face <i>FM</i></div>
+  <div class="mono">87.3 MHz — 표정으로 듣는 라디오</div>
+  <div class="mono onair"><span class="dot"></span><span id="airText">Off air</span></div>
+</div>
+
+<main>
+  <figure>
+    <div class="frame" id="frame">
+      <div class="empty">카메라가 꺼져 있어요<br>아래 버튼을 눌러 방송을 시작하세요</div>
+    </div>
+    <figcaption class="mono"><span>Fig. 1 — 지금의 나</span><span id="clock">--:--:--</span></figcaption>
+
+    <div class="controls">
+      <button id="startBtn">방송 시작 →</button>
+      <button id="muteBtn" class="line" disabled>음소거</button>
+    </div>
+  </figure>
+
+  <section>
+    <div class="label mono">Now playing</div>
+    <h1 class="mood serif off" id="mood">Off air.</h1>
+    <div class="sub" id="sub">표정을 잠깐 유지하면 채널이 바뀝니다.</div>
+    <div class="track mono" id="track">—</div>
+
+    <div class="hold"><div id="holdFill"></div></div>
+    <div class="hold-text mono" id="holdText"></div>
+
+    <div class="eq" id="eq"></div>
+
+    <div class="label mono" style="margin-bottom:8px">Channels</div>
+    <div class="list" id="list"></div>
+  </section>
+</main>
+
+<footer class="mono">
+  <span>데이터와인공지능 — My Own Teachable Machine</span>
+  <span>Model: Teachable Machine (MobileNet 전이학습) · 3 classes</span>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
+<script>
+/* =============== 설정 =============== */
+const MODEL_URL = "https://teachablemachine.withgoogle.com/models/b2I19d-8K/";
+const THRESHOLD = 0.6;   // 이 확률 이상일 때만 표정으로 인정
+const HOLD_MS   = 600;   // 같은 표정 0.6초 유지 시 채널 전환
+const FADE_SEC  = 0.6;   // 크로스페이드 시간
+const SMOOTH    = 0.35;  // 확률 스무딩 (클수록 빠르게 반응)
+
+const MOODS = {
+  smile: {
+    no: "01", word: "Smile.", bpm: 112,
+    sub: "웃으면, 기타와 글로켄슈필이 밝게 울립니다.",
+    track: "Sunny Strings", inst: "Nylon guitar · Glockenspiel",
+    accent: "#2F6BFF", paper: "#EDF3FF",
+  },
+  neutral: {
+    no: "02", word: "Neutral.", bpm: 70,
+    sub: "무표정일 땐, 피아노와 비브라폰이 조용히 흐릅니다.",
+    track: "Quiet Room", inst: "Piano · Vibraphone",
+    accent: "#4F6A9A", paper: "#EEF1F5",
+  },
+  surprise: {
+    no: "03", word: "Surprise!", bpm: 132,
+    sub: "놀라면, 피치카토가 살금살금 튀어나옵니다.",
+    track: "Sneaky Pizzicato", inst: "Pizzicato · Xylophone",
+    accent: "#1F2FD1", paper: "#ECEDFE",
+  },
+};
+const keyOf = (s) => s.trim().toLowerCase();
+
+/* =============== 오디오 =============== */
+let ctx, master, analyser, buses = {}, inst = {};
+let current = null, step = 0, nextTime = 0, muted = false;
+const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+// 무드별로 사용하는 실제 악기 (General MIDI 사운드폰트)
+const INSTRUMENTS = {
+  guitar: ["smile", "acoustic_guitar_nylon"],
+  glock:  ["smile", "glockenspiel"],
+  sbass:  ["smile", "acoustic_bass"],
+  piano:  ["neutral", "acoustic_grand_piano"],
+  vibe:   ["neutral", "vibraphone"],
+  pizz:   ["surprise", "pizzicato_strings"],
+  xylo:   ["surprise", "xylophone"],
+  pbass:  ["surprise", "acoustic_bass"],
+};
+
+function initAudio() {
+  ctx = new (window.AudioContext || window.webkitAudioContext)();
+  master = ctx.createGain(); master.gain.value = 0.9;
+  analyser = ctx.createAnalyser(); analyser.fftSize = 128;
+  master.connect(analyser); analyser.connect(ctx.destination);
+  for (const k in MOODS) {
+    const g = ctx.createGain(); g.gain.value = 0; g.connect(master); buses[k] = g;
+  }
+}
+
+async function loadInstruments() {
+  const keys = Object.keys(INSTRUMENTS);
+  let done = 0;
+  const status = () => {
+    if (done < keys.length) document.getElementById("track").textContent = `악기 불러오는 중… ${done}/${keys.length}`;
+  };
+  status();
+  await Promise.all(keys.map(async (id) => {
+    const [mood, name] = INSTRUMENTS[id];
+    try {
+      inst[id] = await Soundfont.instrument(ctx, name, { soundfont: "FluidR3_GM", destination: buses[mood] });
+    } catch (e) { console.warn("instrument failed", name, e); }
+    done++; status();
+  }));
+  if (current) updateTrackText(current);
+}
+
+function ready(mood) {
+  return Object.entries(INSTRUMENTS).filter(([, v]) => v[0] === mood).every(([id]) => inst[id]);
+}
+
+// 실제 악기 연주
+function play(id, midi, t, dur, gain) {
+  if (inst[id]) inst[id].play(midi, t, { duration: dur, gain });
+}
+
+// 악기를 아직 못 불러왔을 때 쓰는 간단한 신스
+function beep(bus, midi, t, dur, vol = .08, type = "triangle") {
+  const o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = type; o.frequency.value = mtof(midi);
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .01);
+  g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(g); g.connect(bus); o.start(t); o.stop(t + dur + .05);
+}
+
+/* ---- 곡 (8분음표 단위, 4마디 반복) ---- */
+const SONGS = {
+  // C – G – Am – F, 밝은 나일론 기타 아르페지오 + 글로켄슈필 멜로디
+  smile(s, t, bus) {
+    const bar = Math.floor(s / 8) % 4, i = s % 8, b8 = 30 / MOODS.smile.bpm;
+    const chords = [[48,55,60,64,67],[43,50,55,59,62],[45,52,57,60,64],[41,48,53,57,60]];
+    const ch = chords[bar];
+    const arp = [0,1,2,3,4,3,2,1];
+    const mel = [
+      [72,null,76,79,null,76,74,null],
+      [74,null,79,83,null,79,74,null],
+      [76,null,72,76,null,81,79,null],
+      [77,null,76,72,null,74,72,null],
+    ][bar][i];
+    if (ready("smile")) {
+      play("guitar", ch[arp[i]] + 12, t, b8 * 3, 1.2);
+      if (mel) play("glock", mel + 12, t, b8 * 2, 0.9);
+      if (i === 0 || i === 4) play("sbass", ch[0] - 12, t, b8 * 3, 1.6);
+      if (i === 6) play("sbass", ch[1] - 12, t, b8 * 2, 1.2);
+    } else {
+      beep(bus, ch[arp[i]] + 12, t, .3);
+      if (mel) beep(bus, mel + 12, t, .3, .05, "sine");
+    }
+  },
+  // Fmaj7 – Em7 – Dm7 – Cmaj7, 느린 피아노 + 비브라폰
+  neutral(s, t, bus) {
+    const bar = Math.floor(s / 8) % 4, i = s % 8, b8 = 30 / MOODS.neutral.bpm;
+    const chords = [[53,57,60,64],[52,55,59,62],[50,53,57,60],[48,52,55,59]];
+    const ch = chords[bar];
+    const mel = [
+      [null,null,76,null,74,null,72,null],
+      [null,null,74,null,71,null,null,67],
+      [null,null,72,null,69,null,72,74],
+      [76,null,null,null,null,null,null,null],
+    ][bar][i];
+    if (ready("neutral")) {
+      if (i === 0) ch.forEach((m, j) => play("piano", m + 12, t + j * 0.04, b8 * 8, 0.9));
+      if (i === 0 || i === 4) play("piano", ch[0] - 12, t, b8 * 4, 1.0);
+      if (mel) play("vibe", mel, t, b8 * 4, 0.9);
+    } else {
+      if (i === 0) ch.forEach(m => beep(bus, m + 12, t, 2.5, .04, "sine"));
+      if (mel) beep(bus, mel, t, 1, .05);
+    }
+  },
+  // 살금살금 걷는 피치카토 + 갑자기 튀어나오는 실로폰
+  surprise(s, t, bus) {
+    const bar = Math.floor(s / 8) % 4, i = s % 8, b8 = 30 / MOODS.surprise.bpm;
+    const line = [
+      [50,null,57,null,53,null,57,null],
+      [52,null,57,null,51,null,57,null],
+      [50,null,57,null,53,null,55,56],
+      [57,null,null,null,45,null,null,null],
+    ][bar][i];
+    const run = bar === 3 && i >= 2 ? [null,null,74,76,77,79,81,86][i] : null;
+    const pop = bar !== 3 && i % 2 === 1 && Math.random() > 0.82 ? 84 + [0,3,5,7][Math.floor(Math.random()*4)] : null;
+    if (ready("surprise")) {
+      if (line) play("pizz", line + 12, t, b8 * 1.5, 1.6);
+      if (i === 0) play("pbass", (bar === 3 ? 45 : 38), t, b8 * 2, 1.4);
+      if (run) play("xylo", run, t, b8 * 2, 1.0);
+      if (pop) play("xylo", pop, t, b8 * 2, 0.8);
+    } else {
+      if (line) beep(bus, line + 12, t, .15, .08, "square");
+      if (run || pop) beep(bus, run || pop, t, .2, .06, "sine");
+    }
+  },
+};
+
+function scheduler() {
+  if (!current) return;
+  while (nextTime < ctx.currentTime + .15) {
+    SONGS[current](step, nextTime, buses[current]);
+    nextTime += 30 / MOODS[current].bpm; step++;
+  }
+}
+
+function fade(k, to) {
+  const g = buses[k].gain, now = ctx.currentTime;
+  g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.linearRampToValueAtTime(to, now + FADE_SEC);
+}
+
+function updateTrackText(k) {
+  const m = MOODS[k];
+  document.getElementById("track").textContent = `Track ${m.no} — ${m.track} — ${m.inst}`;
+}
+
+function tune(k) {
+  if (k === current) return;
+  if (current) fade(current, 0);
+  current = k; step = 0; nextTime = ctx.currentTime + .05;
+  fade(k, 1);
+
+  const m = MOODS[k], root = document.documentElement.style;
+  root.setProperty("--accent", m.accent);
+  root.setProperty("--paper", m.paper);
+  const mood = document.getElementById("mood");
+  mood.classList.remove("off"); mood.textContent = m.word;
+  document.getElementById("sub").textContent = m.sub;
+  if (Object.keys(inst).length) updateTrackText(k);
+  document.querySelectorAll(".row").forEach(r => r.classList.toggle("on", r.dataset.key === k));
+}
+
+/* =============== 이퀄라이저 =============== */
+const eq = document.getElementById("eq");
+for (let i = 0; i < 40; i++) eq.appendChild(document.createElement("span"));
+function drawEq() {
+  const d = new Uint8Array(analyser.frequencyBinCount); analyser.getByteFrequencyData(d);
+  [...eq.children].forEach((el, i) => el.style.height = Math.max(1, d[i + 2] / 255 * 40) + "px");
+  requestAnimationFrame(drawEq);
+}
+
+/* =============== 시계 =============== */
+setInterval(() => {
+  document.getElementById("clock").textContent = new Date().toTimeString().slice(0, 8);
+}, 1000);
+
+/* =============== 모델 · 웹캠 =============== */
+let model, webcam, cand = null, since = 0, rows = {}, ema = {};
+
+function buildList(labels) {
+  const list = document.getElementById("list");
+  labels.forEach(name => {
+    const k = keyOf(name), m = MOODS[k] || { no: "--", inst: "—", accent: "#13286B" };
+    const r = document.createElement("div");
+    r.className = "row mono"; r.dataset.key = k; r.style.setProperty("--rowc", m.accent);
+    r.innerHTML = `<span>${m.no}</span><span class="name serif">${name}</span><span>${m.inst}</span><span class="meter"><div></div></span><span class="pct">0%</span>`;
+    list.appendChild(r);
+    rows[name] = { bar: r.querySelector(".meter div"), pct: r.querySelector(".pct") };
+  });
+}
+
+async function start() {
+  const btn = document.getElementById("startBtn");
+  btn.disabled = true; btn.textContent = "주파수 맞추는 중…";
+  try {
+    initAudio(); await ctx.resume();
+    loadInstruments();                       // 악기는 뒤에서 불러오기
+    model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
+    webcam = new tmImage.Webcam(400, 400, true);
+    await webcam.setup(); await webcam.play();
+
+    const frame = document.getElementById("frame");
+    frame.innerHTML = `<span class="tag mono">● LIVE</span>`;
+    frame.appendChild(webcam.canvas);
+    const tint = document.createElement("div"); tint.className = "tint"; frame.appendChild(tint);
+
+    buildList(model.getClassLabels());
+    setInterval(scheduler, 25);
+    drawEq();
+
+    document.body.classList.add("live");
+    document.getElementById("airText").textContent = "On air";
+    document.getElementById("muteBtn").disabled = false;
+    btn.textContent = "방송 중";
+    loop();
+  } catch (e) {
+    console.error(e);
+    btn.disabled = false; btn.textContent = "다시 시도 →";
+    document.getElementById("frame").innerHTML =
+      `<div class="empty">카메라 또는 모델을 불러오지 못했어요<br>Chrome에서 열고 카메라 권한을 확인해 주세요</div>`;
+  }
+}
+
+async function loop() {
+  webcam.update();
+  await predict();
+  requestAnimationFrame(loop);
+}
+
+async function predict() {
+  const raw = await model.predict(webcam.canvas);
+  // 프레임마다 흔들리는 확률을 부드럽게 (지수 이동 평균)
+  const preds = raw.map(p => {
+    ema[p.className] = ema[p.className] == null ? p.probability : ema[p.className] + SMOOTH * (p.probability - ema[p.className]);
+    return { className: p.className, probability: ema[p.className] };
+  });
+
+  let top = preds[0];
+  for (const p of preds) {
+    const r = rows[p.className];
+    if (r) { r.bar.style.width = p.probability * 100 + "%"; r.pct.textContent = Math.round(p.probability * 100) + "%"; }
+    if (p.probability > top.probability) top = p;
+  }
+
+  const k = keyOf(top.className), now = performance.now();
+  if (top.probability >= THRESHOLD && MOODS[k]) { if (k !== cand) { cand = k; since = now; } }
+  else cand = null;
+
+  const fill = document.getElementById("holdFill"), txt = document.getElementById("holdText");
+  if (cand && cand !== current) {
+    const p = Math.min(1, (now - since) / HOLD_MS);
+    fill.style.width = p * 100 + "%";
+    txt.textContent = `${top.className} 감지 — 채널 전환 중 ${Math.round(p * 100)}%`;
+    if (p >= 1) tune(cand);
+  } else {
+    fill.style.width = "0";
+    txt.textContent = current ? "다른 표정을 지으면 채널이 바뀝니다" : "";
+  }
+}
+
+document.getElementById("startBtn").onclick = start;
+document.getElementById("muteBtn").onclick = (e) => {
+  muted = !muted;
+  master.gain.setTargetAtTime(muted ? 0 : .9, ctx.currentTime, .1);
+  e.target.textContent = muted ? "소리 켜기" : "음소거";
+};
+</script>
+</body>
+</html>
